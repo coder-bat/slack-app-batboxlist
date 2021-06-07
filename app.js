@@ -136,7 +136,6 @@ app.action('save_task_name', async ({
 }) => {
 	await ack();
 	var taskname = getValueFromState(body, 'task_name');
-	console.log(taskname);
 	web.chat.update({
 		"text": "Assign task",
 		'response_type': 'ephemeral',
@@ -192,10 +191,9 @@ app.action('task_ass', async ({
 	say
 }) => {
 	var obj = body.state.values;
-	console.log(body.message.blocks);
-	// console.log('task assigned', getValueFromState(body, 'task_name'));
 	var taskname = getValueFromState(body, 'task_name');
 	var assigned_user = getValueFromState(body, 'user_list', 'user_arr')[0];
+	console.log(body.state.values.user_list);
 	await ack();
 
 	if (!assigned_user) {
@@ -204,9 +202,9 @@ app.action('task_ass', async ({
 			"replace_original": "false",
 		});
 	} else {
-		console.log(body);
 		var sql = `INSERT INTO tasks (taskname, added_by, added_for, added_on, channel_name, status, status_changed_on) 
 	VALUES ('${taskname}', '${body.user.id}', '${assigned_user}', '${Date.now()}', '${body.channel.name}', 'pending', ${Date.now()})`;
+		console.log(sql);
 		connection.query(sql, function (err, result) {
 			if (err) throw err;
 			web.chat.update({
@@ -225,7 +223,6 @@ app.action('task_ass', async ({
 					}
 				}]
 			});
-			console.log("1 record inserted");
 		});
 	}
 });
@@ -235,101 +232,200 @@ app.command("/list", async ({
 	ack,
 	say
 }) => {
-	try {
-		await ack();
-		var userid = command.user_id;
-		var tasksList = [];
-		var doneTasks = [];
-		var sql = `SELECT * FROM tasks WHERE  
+	if (!command.text || command.text == '') {
+		try {
+			await ack();
+			var userid = command.user_id;
+			var tasksList = [];
+			var doneTasks = [];
+			var sql = `SELECT * FROM tasks WHERE  
 		added_for="${userid}"`;
-		connection.query(sql, function (err, result) {
-			if (err) throw err;
-			result.forEach(element => {
-				tasksList.push({
-					"value": `${element.taskid}`,
+			connection.query(sql, function (err, result) {
+				if (err) throw err;
+				result.forEach(element => {
+					tasksList.push({
+						"value": `${element.taskid}`,
+						"text": {
+							"type": element.status == "done" ? "mrkdwn" : "plain_text",
+							"text": element.status == "done" ? `~${element.taskname}~` : `${element.taskname}`,
+						}
+					});
+				});
+				var perChunk = 10;
+
+				var tasksListInChunk = tasksList.reduce((resultArray, item, index) => {
+					const chunkIndex = Math.floor(index / perChunk)
+
+					if (!resultArray[chunkIndex]) {
+						resultArray[chunkIndex] = [] // start a new chunk
+					}
+
+					resultArray[chunkIndex].push(item)
+
+					return resultArray
+				}, []);
+
+				tasksListInChunk.forEach((item, index) => {
+					doneTasks[index] = item.filter(task => task.text.type === "mrkdwn");
+				})
+				var blocks = [];
+
+				blocks.push({
+					"type": "section",
+					"block_id": `task_list_header`,
 					"text": {
-						"type": element.status == "done" ? "mrkdwn" : "plain_text",
-						"text": element.status == "done" ? `~${element.taskname}~` : `${element.taskname}`,
+						"type": "plain_text",
+						"text": `List of all tasks for <@${command.user_name}>`
+					},
+				});
+
+
+				tasksListInChunk.forEach(function (item, index) {
+					if (doneTasks[index] && doneTasks[index].length > 0) {
+						blocks.push({
+							"type": "section",
+							"block_id": `task_list_${index}_${userid}`,
+							"text": {
+								"type": "plain_text",
+								"text": ' '
+							},
+							"accessory": {
+								"type": "checkboxes",
+								"action_id": "task_status_update",
+								"initial_options": doneTasks[index],
+								"options": tasksListInChunk[index],
+							}
+						});
+					}
+					else {
+						blocks.push({
+							"type": "section",
+							"block_id": `task_list_${index}_${userid}`,
+							"text": {
+								"type": "plain_text",
+								"text": ' '
+							},
+							"accessory": {
+								"type": "checkboxes",
+								"action_id": "task_status_update",
+								"options": tasksListInChunk[index],
+							}
+						});
 					}
 				});
+
+				web.chat.postMessage({
+					"text": "List of all tasks",
+					"channel": command.channel ? command.channel.id : command.channel_id,
+					"text": "List of all tasks",
+					blocks,
+				});
 			});
-			var perChunk = 10;
-
-			var tasksListInChunk = tasksList.reduce((resultArray, item, index) => {
-				const chunkIndex = Math.floor(index / perChunk)
-
-				if (!resultArray[chunkIndex]) {
-					resultArray[chunkIndex] = [] // start a new chunk
-				}
-
-				resultArray[chunkIndex].push(item)
-
-				return resultArray
-			}, []);
-
-			tasksListInChunk.forEach((item, index) => {
-				doneTasks[index] = item.filter(task => task.text.type === "mrkdwn");
-			})
-
-			console.log(doneTasks);
-
-			var blocks = [];
-
-			blocks.push({
-				"type": "section",
-				"block_id": `task_list_header`,
-				"text": {
-					"type": "plain_text",
-					"text": `List of all tasks for <@${command.user_name}>`
-				},
-			});
-
-
-			tasksListInChunk.forEach(function (item, index) {
-				console.log(item);
-				if (doneTasks[index]) {
-					blocks.push({
-						"type": "section",
-						"block_id": `task_list_${index}`,
+		} catch (error) {
+			console.log("err")
+			console.error(error);
+		}
+	}
+	else {
+		try {
+			await ack();
+			var username = command.text.replace('@', '');
+			const useridAsync = async () => {
+				const result = await getUserIDByUsername(username);
+				return result;
+			}
+			const userid = await useridAsync();
+			console.log(userid);
+			var tasksList = [];
+			var doneTasks = [];
+			var sql = `SELECT * FROM tasks WHERE  
+			added_for="${userid}"`;
+			connection.query(sql, function (err, result) {
+				if (err) throw err;
+				result.forEach(element => {
+					tasksList.push({
+						"value": `${element.taskid}`,
 						"text": {
-							"type": "plain_text",
-							"text": ' '
-						},
-						"accessory": {
-							"type": "checkboxes",
-							"action_id": "task_status_update",
-							"initial_options": doneTasks[index],
-							"options": tasksListInChunk[index],
+							"type": element.status == "done" ? "mrkdwn" : "plain_text",
+							"text": element.status == "done" ? `~${element.taskname}~` : `${element.taskname}`,
 						}
 					});
-				}
-				else {
-					blocks.push({
-						"type": "section",
-						"block_id": `task_list_${index}`,
-						"text": {
-							"type": "plain_text",
-							"text": ' '
-						},
-						"accessory": {
-							"type": "checkboxes",
-							"action_id": "task_status_update",
-							"options": tasksListInChunk[index],
-						}
-					});
-				}
-			});
+				});
+				var perChunk = 10;
 
-			web.chat.postMessage({
-				"text": "List of all tasks",
-				"channel": command.channel ? command.channel.id : command.channel_id,
-				"text": "List of all tasks",
-				blocks,
+				var tasksListInChunk = tasksList.reduce((resultArray, item, index) => {
+					const chunkIndex = Math.floor(index / perChunk)
+
+					if (!resultArray[chunkIndex]) {
+						resultArray[chunkIndex] = [] // start a new chunk
+					}
+
+					resultArray[chunkIndex].push(item)
+
+					return resultArray
+				}, []);
+
+				tasksListInChunk.forEach((item, index) => {
+					doneTasks[index] = item.filter(task => task.text.type === "mrkdwn");
+				})
+				var blocks = [];
+
+				blocks.push({
+					"type": "section",
+					"block_id": `task_list_header`,
+					"text": {
+						"type": "plain_text",
+						"text": `List of all tasks for <@${username}>`
+					},
+				});
+
+
+				tasksListInChunk.forEach(function (item, index) {
+					if (doneTasks[index] && doneTasks[index].length > 0) {
+						console.log(doneTasks[index]);
+						blocks.push({
+							"type": "section",
+							"block_id": `task_list_${index}_${userid}`,
+							"text": {
+								"type": "plain_text",
+								"text": ' '
+							},
+							"accessory": {
+								"type": "checkboxes",
+								"action_id": "task_status_update",
+								"initial_options": doneTasks[index],
+								"options": tasksListInChunk[index],
+							}
+						});
+					}
+					else {
+						blocks.push({
+							"type": "section",
+							"block_id": `task_list_${index}_${userid}`,
+							"text": {
+								"type": "plain_text",
+								"text": ' '
+							},
+							"accessory": {
+								"type": "checkboxes",
+								"action_id": "task_status_update",
+								"options": tasksListInChunk[index],
+							}
+						});
+					}
+				});
+
+				web.chat.postMessage({
+					"text": "List of all tasks",
+					"channel": command.channel ? command.channel.id : command.channel_id,
+					"text": "List of all tasks",
+					blocks,
+				});
 			});
-		});
-	} catch (error) {
-		console.log("err")
-		console.error(error);
+		} catch (error) {
+			console.log("err")
+			console.error(error);
+		}
 	}
 });
 
@@ -339,13 +435,18 @@ app.action('task_status_update', async ({
 	say
 }) => {
 	var obj = body;
-	console.log(body);
 	var cbs = getSelectedCB(body);
 	var allCbsInBlock = body.message.blocks.filter(obj => {
 		return obj.block_id === body.actions[0].block_id
 	})[0].accessory.options;
 	await ack();
-	// console.log(cbs);
+	var userid = body.user.id;
+	if ((body.actions[0].block_id.match(/_/g) || []).length > 0) {
+		var tempArr = body.actions[0].block_id.split('_');
+		userid = tempArr[tempArr.length - 1];
+	}
+	console.log(body.actions[0]);
+	console.log(userid);
 
 	if (cbs && allCbsInBlock) {
 		var doneTasksIDs = [];
@@ -359,15 +460,20 @@ app.action('task_status_update', async ({
 			}
 		});
 
+		if(pendingTaskIDs.length == 0) {
+			pendingTaskIDs = ['0'];
+		}
+
+		if(doneTasksIDs.length == 0) {
+			doneTasksIDs = ['0'];
+		}
+
 		var sql = `UPDATE tasks SET status='done',status_changed_on=${Date.now()}  WHERE taskid IN (${doneTasksIDs.join(',')})`
 		connection.query(sql, function (err, result) {
 			if (err) throw err;
-			console.log("done records updated");
 			var sql2 = `UPDATE tasks SET status='pending',status_changed_on=${Date.now()} WHERE taskid IN (${pendingTaskIDs.join(',')})`
 			connection.query(sql2, function (err, result2) {
 				if (err) throw err;
-				console.log("pending records updated");
-				var userid = body.user.id;
 				var username = body.user.username;
 				var tasksList = [];
 				var doneTasks = [];
@@ -401,27 +507,23 @@ app.action('task_status_update', async ({
 					tasksListInChunk.forEach((item, index) => {
 						doneTasks[index] = item.filter(task => task.text.type === "mrkdwn");
 					})
-
-					console.log(doneTasks);
-
 					var blocks = [];
 
 					blocks.push({
 						"type": "section",
 						"block_id": `task_list_header`,
 						"text": {
-							"type": "plain_text",
-							"text": `List of all tasks for <@${username}>`
+							"type": "mrkdwn",
+							"text": `List of all tasks for <@${userid}>`
 						},
 					});
 
 
 					tasksListInChunk.forEach(function (item, index) {
-						console.log(item);
-						if (doneTasks[index]) {
+						if (doneTasks[index] && doneTasks[index].length > 0) {
 							blocks.push({
 								"type": "section",
-								"block_id": `task_list_${index}`,
+								"block_id": `task_list_${index}_${userid}`,
 								"text": {
 									"type": "plain_text",
 									"text": ' '
@@ -437,7 +539,7 @@ app.action('task_status_update', async ({
 						else {
 							blocks.push({
 								"type": "section",
-								"block_id": `task_list_${index}`,
+								"block_id": `task_list_${index}_${userid}`,
 								"text": {
 									"type": "plain_text",
 									"text": ' '
@@ -498,4 +600,19 @@ function getSelectedCB(body) {
 		return body.actions[0].selected_options;
 	};
 	return null;
+}
+
+async function getUserIDByUsername(username) {
+	try {
+		var data = await web.users.list();
+		var userInfo = data.members.filter(member => member.name == username);
+		var userID = userInfo[0].id;
+		return userID;
+	}
+	catch (error) {
+		console.log("error" + error);
+	}
+	finally {
+		console.log('done');
+	}
 }
