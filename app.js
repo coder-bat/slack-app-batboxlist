@@ -335,7 +335,15 @@ app.command("/list", async ({
 				return result;
 			}
 			const userid = await useridAsync();
-			console.log(userid);
+
+			if(!userid) {
+				web.chat.postMessage({
+					"text": "No such user :( Please use mention with @",
+					"channel": command.channel ? command.channel.id : command.channel_id,
+				});
+				return;
+			}
+
 			var tasksList = [];
 			var doneTasks = [];
 			var sql = `SELECT * FROM tasks WHERE  
@@ -445,7 +453,6 @@ app.action('task_status_update', async ({
 		var tempArr = body.actions[0].block_id.split('_');
 		userid = tempArr[tempArr.length - 1];
 	}
-	console.log(body.actions[0]);
 	console.log(userid);
 
 	if (cbs && allCbsInBlock) {
