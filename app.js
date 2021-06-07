@@ -8,8 +8,10 @@ const {
 } = require("@slack/web-api");
 const https = require('https');
 const mysql = require('mysql');
+// var cron = require('node-cron');
 const token = process.env.SLACK_TOKEN;
 const web = new WebClient(token);
+
 // Initializes your app with your bot token and signing secret
 const app = new App({
 	token: process.env.SLACK_BOT_TOKEN,
@@ -49,31 +51,31 @@ app.command("/add", async ({
 				"channel": command.channel_id,
 				"replace_original": "true",
 				blocks: [{
-					"type": "input",
-					"block_id": 'task_name',
-					"element": {
-						"type": "plain_text_input"
-					},
-					"label": {
-						"type": "plain_text",
-						"text": "Please add task name",
-						"emoji": true
-					}
-				},
-				{
-					"type": "actions",
-					"elements": [{
-						"type": "button",
-						action_id: 'save_task_name',
-						"text": {
-							"type": "plain_text",
-							"emoji": true,
-							"text": "Save"
+						"type": "input",
+						"block_id": 'task_name',
+						"element": {
+							"type": "plain_text_input"
 						},
-						"style": "primary",
-						"value": "save_task_name"
-					}]
-				}
+						"label": {
+							"type": "plain_text",
+							"text": "Please add task name",
+							"emoji": true
+						}
+					},
+					{
+						"type": "actions",
+						"elements": [{
+							"type": "button",
+							action_id: 'save_task_name',
+							"text": {
+								"type": "plain_text",
+								"emoji": true,
+								"text": "Save"
+							},
+							"style": "primary",
+							"value": "save_task_name"
+						}]
+					}
 				],
 			});
 		} else {
@@ -82,44 +84,44 @@ app.command("/add", async ({
 				"channel": command.channel_id,
 				"replace_original": "true",
 				blocks: [{
-					"type": "input",
-					"block_id": "task_name",
-					"label": {
-						"type": "plain_text",
-						"text": "Task name"
-					},
-					"element": {
-						"type": "plain_text_input",
-						"action_id": "plain_input",
-						"initial_value": `${command.text}`
-					}
-				},
-				{
-					"type": "input",
-					"block_id": 'user_list',
-					"element": {
-						"type": "multi_users_select"
-					},
-					"label": {
-						"type": "plain_text",
-						"text": "Assign task to",
-						"emoji": true
-					}
-				},
-				{
-					"type": "actions",
-					"elements": [{
-						"type": "button",
-						action_id: 'task_ass',
-						"text": {
+						"type": "input",
+						"block_id": "task_name",
+						"label": {
 							"type": "plain_text",
-							"emoji": true,
-							"text": "Save"
+							"text": "Task name"
 						},
-						"style": "primary",
-						"value": "assign_task"
-					}]
-				}
+						"element": {
+							"type": "plain_text_input",
+							"action_id": "plain_input",
+							"initial_value": `${command.text}`
+						}
+					},
+					{
+						"type": "input",
+						"block_id": 'user_list',
+						"element": {
+							"type": "multi_users_select"
+						},
+						"label": {
+							"type": "plain_text",
+							"text": "Assign task to",
+							"emoji": true
+						}
+					},
+					{
+						"type": "actions",
+						"elements": [{
+							"type": "button",
+							action_id: 'task_ass',
+							"text": {
+								"type": "plain_text",
+								"emoji": true,
+								"text": "Save"
+							},
+							"style": "primary",
+							"value": "assign_task"
+						}]
+					}
 				]
 			});
 		}
@@ -143,44 +145,44 @@ app.action('save_task_name', async ({
 		'channel': body.container.channel_id,
 		'replace_original': true,
 		blocks: [{
-			"type": "input",
-			"block_id": "task_name",
-			"label": {
-				"type": "plain_text",
-				"text": "Task name"
-			},
-			"element": {
-				"type": "plain_text_input",
-				"action_id": "plain_input",
-				"initial_value": `${taskname}`
-			}
-		},
-		{
-			"type": "input",
-			"block_id": 'user_list',
-			"element": {
-				"type": "multi_users_select"
-			},
-			"label": {
-				"type": "plain_text",
-				"text": "Assign task to",
-				"emoji": true
-			}
-		},
-		{
-			"type": "actions",
-			"elements": [{
-				"type": "button",
-				action_id: 'task_ass',
-				"text": {
+				"type": "input",
+				"block_id": "task_name",
+				"label": {
 					"type": "plain_text",
-					"emoji": true,
-					"text": "Save"
+					"text": "Task name"
 				},
-				"style": "primary",
-				"value": "assign_task"
-			}]
-		}
+				"element": {
+					"type": "plain_text_input",
+					"action_id": "plain_input",
+					"initial_value": `${taskname}`
+				}
+			},
+			{
+				"type": "input",
+				"block_id": 'user_list',
+				"element": {
+					"type": "users_select"
+				},
+				"label": {
+					"type": "plain_text",
+					"text": "Assign task to",
+					"emoji": true
+				}
+			},
+			{
+				"type": "actions",
+				"elements": [{
+					"type": "button",
+					action_id: 'task_ass',
+					"text": {
+						"type": "plain_text",
+						"emoji": true,
+						"text": "Save"
+					},
+					"style": "primary",
+					"value": "assign_task"
+				}]
+			}
 		]
 	})
 });
@@ -192,8 +194,7 @@ app.action('task_ass', async ({
 }) => {
 	var obj = body.state.values;
 	var taskname = getValueFromState(body, 'task_name');
-	var assigned_user = getValueFromState(body, 'user_list', 'user_arr')[0];
-	console.log(body.state.values.user_list);
+	var assigned_user = getValueFromState(body, 'user_list', 'user_arr');
 	await ack();
 
 	if (!assigned_user) {
@@ -248,7 +249,7 @@ app.command("/list", async ({
 						"text": {
 							"type": element.status == "done" ? "mrkdwn" : "plain_text",
 							"text": element.status == "done" ? `~${element.taskname}~` : `${element.taskname}`,
-						}
+						},
 					});
 				});
 				var perChunk = 10;
@@ -296,8 +297,7 @@ app.command("/list", async ({
 								"options": tasksListInChunk[index],
 							}
 						});
-					}
-					else {
+					} else {
 						blocks.push({
 							"type": "section",
 							"block_id": `task_list_${index}_${userid}`,
@@ -325,8 +325,7 @@ app.command("/list", async ({
 			console.log("err")
 			console.error(error);
 		}
-	}
-	else {
+	} else {
 		try {
 			await ack();
 			var username = command.text.replace('@', '');
@@ -336,7 +335,7 @@ app.command("/list", async ({
 			}
 			const userid = await useridAsync();
 
-			if(!userid) {
+			if (!userid) {
 				web.chat.postMessage({
 					"text": "No such user :( Please use mention with @",
 					"channel": command.channel ? command.channel.id : command.channel_id,
@@ -405,8 +404,7 @@ app.command("/list", async ({
 								"options": tasksListInChunk[index],
 							}
 						});
-					}
-					else {
+					} else {
 						blocks.push({
 							"type": "section",
 							"block_id": `task_list_${index}_${userid}`,
@@ -461,17 +459,16 @@ app.action('task_status_update', async ({
 		allCbsInBlock.forEach((item, index) => {
 			if (cbs.some(cb => cb.value === item.value)) {
 				doneTasksIDs.push(`${item.value}`);
-			}
-			else {
+			} else {
 				pendingTaskIDs.push(`${item.value}`);
 			}
 		});
 
-		if(pendingTaskIDs.length == 0) {
+		if (pendingTaskIDs.length == 0) {
 			pendingTaskIDs = ['0'];
 		}
 
-		if(doneTasksIDs.length == 0) {
+		if (doneTasksIDs.length == 0) {
 			doneTasksIDs = ['0'];
 		}
 
@@ -542,8 +539,7 @@ app.action('task_status_update', async ({
 									"options": tasksListInChunk[index],
 								}
 							});
-						}
-						else {
+						} else {
 							blocks.push({
 								"type": "section",
 								"block_id": `task_list_${index}_${userid}`,
@@ -576,10 +572,8 @@ app.action('task_status_update', async ({
 function getValueFromState(body, block_id, type = 'default', multiple_blocks = false) {
 	if (type == 'user_arr') {
 		var obj = body.state.values[block_id];
-		return obj[Object.keys(obj)[0]].selected_users;
-	}
-
-	else if (type == 'checkboxes') {
+		return obj[Object.keys(obj)[0]].selected_user;
+	} else if (type == 'checkboxes') {
 		var obj = body.state.values;
 		var selectedOptions = [];
 		for (const single_block in obj) {
@@ -587,9 +581,7 @@ function getValueFromState(body, block_id, type = 'default', multiple_blocks = f
 			selectedOptions = selectedOptions.concat(temp);
 		}
 		return selectedOptions;
-	}
-
-	else {
+	} else {
 		var obj = body.state.values[block_id];
 		if (obj[Object.keys(obj)[0]]) {
 			return obj[Object.keys(obj)[0]].value;
@@ -615,11 +607,15 @@ async function getUserIDByUsername(username) {
 		var userInfo = data.members.filter(member => member.name == username);
 		var userID = userInfo[0].id;
 		return userID;
-	}
-	catch (error) {
+	} catch (error) {
 		console.log("error" + error);
-	}
-	finally {
+	} finally {
 		console.log('done');
 	}
 }
+
+// const task = cron.schedule('* * * * *', () => {
+// 	console.log('running a task every minute');
+// }, {
+// 	scheduled: true,
+// });
