@@ -5,7 +5,8 @@
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon app.js"
+    "dev": "nodemon app.js",
+    "start": "pm2-runtime start ecosystem.config.js --env production"
   },
   "author": "Viral",
   "license": "ISC",
