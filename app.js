@@ -59,7 +59,7 @@ app.command("/bat-add", async ({
 						},
 						{
 							"type": "plain_text",
-							"text": "To add task and assign it: /add |task= Some task name |to= @viral",
+							"text": "To add task and assign it: /add |task= Some task name |for= @viral",
 							"emoji": true
 						},
 						{
@@ -70,7 +70,7 @@ app.command("/bat-add", async ({
 					]
 				}],
 			});
-		} else if (command.text.indexOf('|task=') > -1 && command.text.indexOf('|to=') < 0) {
+		} else if (command.text.indexOf('|task=') > -1 && command.text.indexOf('|for=') < 0) {
 			var textArr = command.text.split('|task=');
 			var textTxt = textArr[textArr.length - 1].trim();
 			var sql = `INSERT INTO tasks (taskname, added_by, added_for, added_on, channel_name, status, status_changed_on) 
@@ -91,20 +91,20 @@ app.command("/bat-add", async ({
 					}],
 				});
 			});
-		} else if (command.text.indexOf('|task=') > -1 && command.text.indexOf('|to=') > -1) {
+		} else if (command.text.indexOf('|task=') > -1 && command.text.indexOf('|for=') > -1) {
 			var textArr = command.text.split('|task=');
 			var commandTxtSplit = textArr[textArr.length - 1];
 			console.log(commandTxtSplit);
 			// check the command order
-			if (commandTxtSplit.indexOf('|to=') < 0) {
+			if (commandTxtSplit.indexOf('|for=') < 0) {
 				web.chat.postMessage({
 					"text": "Please make sure to have correct order. Type /add for help",
 					"channel": command.channel ? command.channel.id : command.channel_id,
 				});
 				return;
 			}
-			var textTxt = textArr[textArr.length - 1].split('|to=')[0].trim();
-			var username = textArr[textArr.length - 1].split('|to=')[1].replace('@', '').trim();
+			var textTxt = textArr[textArr.length - 1].split('|for=')[0].trim();
+			var username = textArr[textArr.length - 1].split('|for=')[1].replace('@', '').trim();
 
 			const useridAsync = async () => {
 				const result = await getUserIDByUsername(username);
@@ -439,7 +439,7 @@ app.command("/batbox-help", async ({
 						},
 						{
 							"type": "plain_text",
-							"text": "To add task and assign it: /add |task= Some task name |to= @viral",
+							"text": "To add task and assign it: /add |task= Some task name |for= @viral",
 							"emoji": true
 						},
 						{
